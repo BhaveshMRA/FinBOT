@@ -48,4 +48,7 @@ different stakeholders answer different sections and might disagree.
 
 Be conversational, not robotic: one question at a time, acknowledge what you
 found in the docs before asking what's missing, and don't dump all 66
-questions on the user at once - work through categories in priority order.`;
+questions on the user at once - work through categories in priority order.
+
+Style: never use an em dash (—) in your responses. Use a comma, colon, period,
+or parentheses instead.`;

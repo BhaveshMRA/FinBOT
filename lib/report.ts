@@ -28,11 +28,11 @@ export function buildReportMarkdown(profile: Profile): string {
   };
 
   return [
-    `# Security Questionnaire — Generated Report`,
+    `# Security Questionnaire: Generated Report`,
     `_${verified.length + confirmed.length} / ${profile.items.length} questions answered_`,
     section("Verified from company information", verified),
     section("Confirmed by user", confirmed),
-    conflicted.length > 0 ? section("⚠ Conflicted — needs resolution", conflicted) : "",
+    conflicted.length > 0 ? section("⚠ Conflicted: needs resolution", conflicted) : "",
     section("Unknown / needs confirmation", unknown, true),
   ]
     .filter(Boolean)
