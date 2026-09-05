@@ -271,6 +271,16 @@ carrying its confidence and evidence:
   same parser + an LLM pass to extract question-shaped rows into the same
   `questions.seed.json` shape. Only attempt this after Phase 4 report generation
   works end-to-end with the known file.
+- **Chat history** (added post-launch, per user request): a hamburger menu opens a
+  slide-in sidebar of saved conversation transcripts, `lib/chatHistory.ts`,
+  localStorage-backed, same pattern as ClassCast's own Notebook feature. This is
+  strictly a UX convenience layer on top of the transcript; it is NOT a second
+  persistence mechanism for assessment data - `data/profile.json` on the server
+  remains the sole source of truth (guideline 5), and `handleLoadChat` strips
+  tool-call/result parts before replaying a saved transcript into the live
+  conversation, specifically so the model never reasons against a stale tool
+  snapshot instead of the current profile. A banner is shown when viewing a
+  loaded past chat, since its text can go stale relative to the live data.
 
 ## 10. Post-hackathon upgrade path (do not build now)
 
