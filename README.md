@@ -65,7 +65,7 @@ FinBOT is a conversational agent that:
 - No vector DB, no embeddings: retrieval is keyword/term-overlap search, which
   is enough for policy documents that share vocabulary with the questions
 - **Block Convey PRISM** (zero-code LLM proxy) - every model call is traced
-  for observability; see "Mandatory Hackathon Tooling" below
+  for observability; see "Hackathon Sponsor Tooling" below
 
 ## How It Works
 
@@ -143,17 +143,29 @@ regenerates from `questions.seed.json` on the next request).
   own wording (upgrade path: embeddings-based retrieval).
 - Respondent identity is self-declared (`setRespondent`), not authenticated.
 
-## Mandatory Hackathon Tooling
+## Hackathon Sponsor Tooling
 
-- **GIDE** - the IDE this project was built in.
-- **Block Convey PRISM** - live agent observability. PRISM's official SDK is
-  Python-only (LangChain/LangGraph-oriented), so instead we use its zero-code
-  LLM proxy: `lib/model.ts` points the Anthropic client at PRISM's proxy URL
-  with an `X-PRISMtrace-Key` header, so every real model call is traced
-  without adding a Python dependency to a Node/TypeScript app. PRISM's proxy
-  currently 500s on streaming requests, worked around with the AI SDK's
-  `simulateStreamingMiddleware` (forces a non-streaming call to the proxy,
-  which works, while still streaming the response to the browser). Verified
-  live: 5/5 real requests appear in PRISM's Traces dashboard with correct
-  model, latency, and token counts. Falls back to calling Anthropic directly
-  if `PRISMTRACE_API_KEY` isn't set.
+- **GIDE** (mandatory) - the IDE this project was built in.
+- **Block Convey PRISM** (mandatory) - live agent observability. PRISM's
+  official SDK is Python-only (LangChain/LangGraph-oriented), so instead we
+  use its zero-code LLM proxy: `lib/model.ts` points the Anthropic client at
+  PRISM's proxy URL with an `X-PRISMtrace-Key` header, so every real model
+  call is traced without adding a Python dependency to a Node/TypeScript app.
+  PRISM's proxy currently 500s on streaming requests, worked around with the
+  AI SDK's `simulateStreamingMiddleware` (forces a non-streaming call to the
+  proxy, which works, while still streaming the response to the browser).
+  Verified live: real requests appear in PRISM's Traces dashboard with
+  correct model, latency, and token counts. Falls back to calling Anthropic
+  directly if `PRISMTRACE_API_KEY` isn't set.
+- **Prelint** (optional) - product-decision review on every pull request.
+  Connected to `github.com/BhaveshMRA/FinBOT` with automatic reviews enabled.
+  Verified live on PR #1 ("Add a Reset demo button"): Spec Review returned
+  "LGTM," and the Decision Review flagged a real tradeoff (the reset button
+  destroys audit-trail data with no undo) and correctly concluded it's
+  acceptable for a demo tool, a genuine catch, not a rubber stamp.
+- **ElevenLabs** (optional) - text-to-speech for the voice bonus; see
+  "Voice interaction" in Key Features and `app/api/speak/route.ts`.
+- **Tavily** (optional) - not used. FinBOT's whole premise is grounding
+  answers in the company's own internal documents rather than the public
+  web, so a web-search tool doesn't fit the core product without diluting
+  the "search your own docs first" guarantee.
