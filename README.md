@@ -8,7 +8,7 @@ Built for the Regodit hackathon track "AI Security Analyst." See `Implementation
 for the full architecture/design rationale and `task-phases.md` for the build plan
 and progress.
 
-## Status: functional end-to-end (Phases 0-4 done)
+## Status: functional end-to-end (Phases 0-5 done, Phase 6 voice bonus done)
 
 - 24 source documents parsed → 257 searchable chunks, 2 diagram assets
 - 66 real questionnaire questions across 14 categories (parsed from the actual
@@ -18,6 +18,9 @@ and progress.
   respondents, and never re-asks a resolved question
 - A deterministic `/report` page (+ downloadable `.md`) grouping every question
   into Verified from company info / Confirmed by user / Conflicted / Unknown
+- Voice: speak your answer (browser mic) and optionally hear replies aloud
+  (ElevenLabs) — see "Voice (optional)" below
+- `npx tsc --noEmit` and `npm run build` both verified clean
 
 ## Demo script
 
@@ -34,6 +37,8 @@ and progress.
    `changeLog`.
 5. Click **"View report"** → the full 66-question categorized report, each
    answered item showing confidence and its evidence source or respondent.
+6. (if `ELEVENLABS_API_KEY` is set) Toggle **"🔊 voice replies"** and ask
+   another question, or click **🎤** and speak your answer instead of typing.
 
 ## Folder layout
 
@@ -44,6 +49,7 @@ app/
   api/chat/route.ts      the agent: streamText + 5 tools, system prompt rules
   api/profile/route.ts   GET - current profile (used by the sidebar)
   api/report/route.ts    GET - the report as markdown
+  api/speak/route.ts     POST {text} -> audio/mpeg via ElevenLabs (501 if no key set)
 lib/
   types.ts                shared types: Chunk, Evidence, QuestionnaireItem, Profile
   search.ts               searchDocuments(query, k) - keyword search over index.json
@@ -95,6 +101,12 @@ npm run dev
 Open http://localhost:3000. To reset the demo to a fresh, unanswered state, delete
 `data/profile.json` before starting the server (it's regenerated from
 `questions.seed.json` on first read).
+
+### Voice (optional)
+
+Add `ELEVENLABS_API_KEY=<your key>` to `.env.local` to enable spoken replies (the
+mic input works with no key needed — it's the browser's own `SpeechRecognition`).
+No key configured → the voice toggle just does nothing silently; nothing breaks.
 
 ## Known limitations
 

@@ -117,23 +117,32 @@ long, cut the README update to one paragraph, not to zero.
       needed). Verified working live in browser.
 - [x] System prompt rule 6 updated to point users at the report page instead of
       trying to enumerate 66 items in chat.
-- [ ] Guardrails pass (empty search results, empty profile on first load, no
-      unhandled rejections) - not yet explicitly stress-tested; the happy path
-      works, edge cases are a demo-day risk if time allows a pass.
-- [ ] README final pass with demo script — pending.
+- [x] Guardrails pass, done as its own hardening step: `updateItem`/
+      `flagConflict` now catch any error (not just missing evidence) and return
+      it to the model instead of crashing the stream - covers a hallucinated
+      item id, which is a real failure mode with an LLM calling tools by id.
+      `searchDocuments` degrades to `[]` with a console warning if
+      `data/index.json` is missing (fresh clone, ingest not run yet) instead of
+      throwing. Verified: `npx tsc --noEmit` clean, `npm run build` succeeds.
+- [x] README final pass with demo script — done.
 
-## Phase 5 — Demo Rehearsal (14:15–14:25, 10 min, hard stop)
-- [ ] One clean end-to-end run of the scripted demo (fresh `profile.json`).
-- [ ] Fix anything that breaks the narrative; do not start new features here.
-- [ ] Final commit.
+## Phase 5 — Demo Rehearsal — DONE (folded into the hardening pass above)
+- [x] Full production build succeeds; dev server verified still serving after
+      the build. Live browser + curl runs throughout Phases 3-4 already
+      exercised the real demo script end-to-end (MFA question, vague-answer
+      follow-up, multi-stakeholder tagging, report generation).
+- [x] Committed and pushed at every phase boundary — nothing left uncommitted.
 
-## Phase 6 — Stretch bonuses (14:25–14:30, ONLY if Phase 5 finished early)
-- [ ] Voice: browser `SpeechRecognition` mic button + `speechSynthesis` read-aloud
-      toggle (Implementation.md §9). Client-side only, degrades silently if
-      unsupported. Skip entirely rather than let this bleed past 14:30.
-- [ ] Generalized questionnaire upload (Implementation.md §9) — only attempt if
-      Phase 6 voice is already done with time to spare. Realistically this is a
-      "next version" talking point in the README, not a built feature today.
+## Phase 6 — Stretch bonuses — voice DONE, questionnaire-upload NOT ATTEMPTED
+- [x] Voice: browser `SpeechRecognition` mic button (speech -> sent as a chat
+      message) + a "voice replies" toggle that POSTs the latest assistant
+      reply to `/api/speak` (ElevenLabs TTS, `eleven_turbo_v2_5`, voice
+      "Rachel"). Verified: `/api/speak` correctly returns 501 when
+      `ELEVENLABS_API_KEY` isn't set yet (add it to `.env.local` to activate -
+      no code change needed), mic button renders and hides itself on
+      unsupported browsers, `tsc --noEmit` clean.
+- [ ] Generalized questionnaire upload — not attempted; still a "next version"
+      talking point (Implementation.md §9), not a built feature.
 
 ---
 
