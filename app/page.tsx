@@ -71,10 +71,31 @@ function messageText(message: { parts: Array<{ type: string; text?: string }> })
   return message.parts.filter((p) => p.type === "text").map((p) => p.text ?? "").join(" ");
 }
 
+// ClassCast palette (see ClassCast-Lecture-Assistant/frontend/index.html):
+// warm off-white background, white bordered panels, three-color status system.
+const pill = {
+  green: "bg-[#d4f4dd] text-[#1a5e2e]",
+  amber: "bg-[#fff4d4] text-[#7a5d00]",
+  red: "bg-[#f8d7d7] text-[#7a1a1a]",
+  blue: "bg-[#e8efff] text-[#1a3e7e]",
+  neutral: "bg-[#f0f0ee] text-[#555]",
+};
+const outlineButton = {
+  blue: "border border-[#1a3e7e] bg-[#e8efff] text-[#1a3e7e]",
+  red: "border border-[#7a1a1a] bg-[#f8d7d7] text-[#7a1a1a]",
+  neutral: "border border-[#d9d9d6] bg-[#fafaf9] text-[#555]",
+};
+
+function confidencePill(confidence: number) {
+  if (confidence >= 80) return pill.green;
+  if (confidence >= 50) return pill.amber;
+  return pill.red;
+}
+
 const markdownComponents: Components = {
   p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
   strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
-  blockquote: ({ children }) => <blockquote className="border-l-2 border-neutral-300 pl-2 italic opacity-80 my-2">{children}</blockquote>,
+  blockquote: ({ children }) => <blockquote className="border-l-2 border-[#d9d9d6] pl-2 italic opacity-80 my-2">{children}</blockquote>,
   ul: ({ children }) => <ul className="list-disc list-inside my-2 space-y-1">{children}</ul>,
   ol: ({ children }) => <ol className="list-decimal list-inside my-2 space-y-1">{children}</ol>,
   code: ({ children }) => <code className="bg-black/10 rounded px-1 text-[0.85em]">{children}</code>,
@@ -92,25 +113,19 @@ function documentUrl(sourceFile: string) {
   return `/api/document?sourceFile=${encodeURIComponent(sourceFile)}`;
 }
 
-function confidenceColor(confidence: number) {
-  if (confidence >= 80) return "bg-green-100 text-green-800 border-green-300";
-  if (confidence >= 50) return "bg-amber-100 text-amber-800 border-amber-300";
-  return "bg-red-100 text-red-800 border-red-300";
-}
-
 function ToolPart({ type, output }: { type: string; output: unknown }) {
   const toolName = type.slice("tool-".length);
   const item = output as Partial<QuestionnaireItem> & { error?: string };
 
   if (item?.error) {
-    return <div className="text-xs text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1 my-1">⚠ {item.error}</div>;
+    return <div className={`text-xs rounded-lg px-2 py-1 my-1 ${pill.red}`}>⚠ {item.error}</div>;
   }
 
   if (toolName === "updateItem" && item?.status) {
     const lastEvidence = item.evidence?.[item.evidence.length - 1];
     const isDoc = Boolean(lastEvidence?.sourceFile);
     return (
-      <div className={`text-xs border rounded px-2 py-1 my-1 ${confidenceColor(item.confidence ?? 0)}`}>
+      <div className={`text-xs rounded-lg px-2 py-1.5 my-1 ${confidencePill(item.confidence ?? 0)}`}>
         {isDoc ? "📄" : "🗣"} {item.answer ?? item.status} (confidence: {item.confidence}%)
         {lastEvidence?.sourceFile && (
           <div className="opacity-70">
@@ -126,20 +141,36 @@ function ToolPart({ type, output }: { type: string; output: unknown }) {
   }
 
   if (toolName === "flagConflict") {
-    return <div className="text-xs bg-red-50 text-red-800 border border-red-300 rounded px-2 py-1 my-1">⚠ Conflict flagged: needs your input</div>;
+    return <div className={`text-xs rounded-lg px-2 py-1 my-1 ${pill.red}`}>⚠ Conflict flagged: needs your input</div>;
   }
 
   if (toolName === "setRespondent" && item) {
     const p = output as Profile;
-    return <div className="text-xs bg-blue-50 text-blue-800 border border-blue-200 rounded px-2 py-1 my-1">👤 Now answering as: {p.currentRespondent?.name}{p.currentRespondent?.role ? ` (${p.currentRespondent.role})` : ""}</div>;
+    return <div className={`text-xs rounded-lg px-2 py-1 my-1 ${pill.blue}`}>👤 Now answering as: {p.currentRespondent?.name}{p.currentRespondent?.role ? ` (${p.currentRespondent.role})` : ""}</div>;
   }
 
   if (toolName === "searchDocuments") {
     const results = output as Array<{ sourceFile: string }>;
-    return <div className="text-xs text-neutral-500 my-1">🔍 searched documents ({Array.isArray(results) ? results.length : 0} hit{Array.isArray(results) && results.length === 1 ? "" : "s"})</div>;
+    return <div className="text-xs text-[#999] my-1">🔍 searched documents ({Array.isArray(results) ? results.length : 0} hit{Array.isArray(results) && results.length === 1 ? "" : "s"})</div>;
   }
 
   return null;
+}
+
+function StatusPill({ status }: { status: string }) {
+  const map: Record<string, { style: string; label: string }> = {
+    ready: { style: pill.green, label: "Ready" },
+    submitted: { style: pill.amber, label: "Thinking..." },
+    streaming: { style: pill.amber, label: "Responding..." },
+    error: { style: pill.red, label: "Error, try again" },
+  };
+  const { style, label } = map[status] ?? map.ready;
+  return (
+    <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[13px] font-medium ${style}`}>
+      <span className="w-2 h-2 rounded-full bg-current" />
+      {label}
+    </div>
+  );
 }
 
 function ProgressSidebar() {
@@ -157,34 +188,36 @@ function ProgressSidebar() {
   const resolved = profile.items.filter((i) => i.status === "verified_from_docs" || i.status === "confirmed_by_user").length;
   const total = profile.items.length;
   const topUnanswered = profile.items.filter((i) => i.status === "unknown" || i.status === "conflicted").slice(0, 6);
+  const priorityPill = { high: pill.red, medium: pill.amber, low: pill.neutral };
 
   return (
-    <aside className="w-72 shrink-0 border-l border-neutral-200 p-4 text-sm overflow-y-auto">
-      {profile.currentRespondent && (
-        <div className="mb-3 text-xs text-blue-700">
-          Answering as: <strong>{profile.currentRespondent.name}</strong>
-          {profile.currentRespondent.role ? ` (${profile.currentRespondent.role})` : ""}
-        </div>
-      )}
-      <div className="mb-4">
-        <div className="flex justify-between text-xs mb-1">
+    <aside className="w-72 shrink-0 flex flex-col gap-4">
+      <div className="bg-white border border-[#e5e5e3] rounded-xl p-5">
+        <h2 className="text-[13px] font-semibold text-[#555] uppercase tracking-wide mb-3">Progress</h2>
+        {profile.currentRespondent && (
+          <div className="mb-3 text-xs text-[#1a3e7e]">
+            Answering as <strong>{profile.currentRespondent.name}</strong>
+            {profile.currentRespondent.role ? ` (${profile.currentRespondent.role})` : ""}
+          </div>
+        )}
+        <div className="flex justify-between text-xs mb-1 text-[#555]">
           <span>{resolved} / {total} answered</span>
           <span>{Math.round((resolved / total) * 100)}%</span>
         </div>
-        <div className="h-2 bg-neutral-200 rounded overflow-hidden">
-          <div className="h-full bg-green-500" style={{ width: `${(resolved / total) * 100}%` }} />
+        <div className="h-2 bg-[#f0f0ee] rounded-full overflow-hidden">
+          <div className="h-full bg-[#1a5e2e]" style={{ width: `${(resolved / total) * 100}%` }} />
         </div>
       </div>
-      <div>
-        <div className="font-medium text-xs uppercase tracking-wide text-neutral-500 mb-2">Top unanswered (priority)</div>
+      <div className="bg-white border border-[#e5e5e3] rounded-xl p-5">
+        <h2 className="text-[13px] font-semibold text-[#555] uppercase tracking-wide mb-3">Top unanswered (priority)</h2>
         <ul className="space-y-2">
           {topUnanswered.map((item) => (
-            <li key={item.id} className="text-xs">
-              <span className={`inline-block px-1.5 py-0.5 rounded mr-1 ${item.priority === "high" ? "bg-red-100 text-red-700" : item.priority === "medium" ? "bg-amber-100 text-amber-700" : "bg-neutral-100 text-neutral-600"}`}>
+            <li key={item.id} className="text-xs text-[#1c1c1c]">
+              <span className={`inline-block px-1.5 py-0.5 rounded-full mr-1 ${priorityPill[item.priority]}`}>
                 {item.priority}
               </span>
               {item.question.slice(0, 70)}{item.question.length > 70 ? "…" : ""}
-              {item.status === "conflicted" && <span className="text-red-600"> ⚠ conflict</span>}
+              {item.status === "conflicted" && <span className="text-[#7a1a1a]"> ⚠ conflict</span>}
             </li>
           ))}
         </ul>
@@ -220,75 +253,96 @@ export default function Chat() {
   }, [status, voiceOut, messages]);
 
   return (
-    <div className="flex h-screen">
-      <div className="flex flex-col flex-1 max-w-3xl mx-auto p-4 min-h-0">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-lg font-semibold">FinBOT — AI Security Analyst</h1>
+    <div className="min-h-screen p-6">
+      <div className="max-w-[1100px] mx-auto">
+        <div className="flex justify-between items-center mb-1">
+          <h1 className="text-[22px] font-semibold m-0">FinBOT</h1>
           <div className="flex items-center gap-3">
-            <label className="text-xs text-neutral-600 flex items-center gap-1">
+            <label className="text-xs text-[#555] flex items-center gap-1">
               <input type="checkbox" checked={voiceOut} onChange={(e) => setVoiceOut(e.target.checked)} />
               🔊 voice replies
             </label>
-            <Link href="/report" className="text-sm text-blue-600 hover:underline">View report →</Link>
+            <Link href="/report" className={`text-xs font-semibold px-3 py-1.5 rounded-md ${outlineButton.blue}`}>
+              View report
+            </Link>
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto space-y-3 mb-4 min-h-0">
-          {messages.map((message) => (
-            <div key={message.id} className={message.role === "user" ? "text-right" : "text-left"}>
-              <div className={`inline-block max-w-[85%] rounded-lg px-3 py-2 text-sm ${message.role === "user" ? "bg-blue-600 text-white" : "bg-neutral-100 text-neutral-900"}`}>
-                {message.parts.map((part, i) => {
-                  if (part.type === "text") return <Markdown key={i} text={part.text} />;
-                  if (part.type.startsWith("tool-") && "state" in part && part.state === "output-available") {
-                    return <ToolPart key={i} type={part.type} output={part.output} />;
-                  }
-                  return null;
-                })}
-                {message.role === "assistant" && status === "ready" && (
-                  <button
-                    onClick={() => speak(messageText(message))}
-                    className="block mt-1 text-xs opacity-50 hover:opacity-100"
-                    title="Speak this response"
+        <div className="text-[#666] text-sm mb-4">AI Security Analyst</div>
+        <div className="mb-6"><StatusPill status={status} /></div>
+
+        <div className="flex gap-4 items-start">
+          <div className="bg-white border border-[#e5e5e3] rounded-xl p-5 flex-1 flex flex-col" style={{ height: "calc(100vh - 220px)" }}>
+            <h2 className="text-[13px] font-semibold text-[#555] uppercase tracking-wide mb-3">Conversation</h2>
+            <div className="flex-1 overflow-y-auto space-y-3 min-h-0">
+              {messages.length === 0 && (
+                <div className="text-[#999] text-sm">Say hello, or ask about a control (e.g. &ldquo;Is MFA enabled?&rdquo;).</div>
+              )}
+              {messages.map((message) => (
+                <div key={message.id} className={message.role === "user" ? "text-right" : "text-left"}>
+                  <div
+                    className={`inline-block max-w-[85%] rounded-lg px-3 py-2 text-sm ${
+                      message.role === "user" ? `${pill.blue} border border-[#c9d8ff]` : "bg-[#fafaf9] border border-[#efefec] text-[#1c1c1c]"
+                    }`}
                   >
-                    🔊 speak
-                  </button>
-                )}
-              </div>
+                    {message.parts.map((part, i) => {
+                      if (part.type === "text") return <Markdown key={i} text={part.text} />;
+                      if (part.type.startsWith("tool-") && "state" in part && part.state === "output-available") {
+                        return <ToolPart key={i} type={part.type} output={part.output} />;
+                      }
+                      return null;
+                    })}
+                    {message.role === "assistant" && status === "ready" && (
+                      <button
+                        onClick={() => speak(messageText(message))}
+                        className="block mt-1 text-xs text-[#999] hover:text-[#555]"
+                        title="Speak this response"
+                      >
+                        🔊 speak
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {status === "submitted" && <div className="text-xs text-[#999]">thinking...</div>}
+              <div ref={bottomRef} />
             </div>
-          ))}
-          {status === "submitted" && <div className="text-xs text-neutral-400">thinking…</div>}
-          <div ref={bottomRef} />
-        </div>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!input.trim()) return;
-            sendMessage({ text: input });
-            setInput("");
-          }}
-          className="flex gap-2"
-        >
-          <input
-            className="flex-1 border border-neutral-300 rounded px-3 py-2 text-sm"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Let's fill out the questionnaire..."
-          />
-          {micSupported && (
-            <button
-              type="button"
-              onClick={toggleMic}
-              className={`text-sm px-3 py-2 rounded border ${listening ? "bg-red-500 text-white border-red-500" : "border-neutral-300"}`}
-              title="Speak your answer"
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!input.trim()) return;
+                sendMessage({ text: input });
+                setInput("");
+              }}
+              className="flex gap-2 mt-4"
             >
-              {listening ? "🔴" : "🎤"}
-            </button>
-          )}
-          <button type="submit" className="bg-blue-600 text-white text-sm px-4 py-2 rounded disabled:opacity-50" disabled={status !== "ready"}>
-            Send
-          </button>
-        </form>
+              <input
+                className="flex-1 border border-[#d9d9d6] rounded-md px-3 py-2 text-sm bg-white"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Let's fill out the questionnaire..."
+              />
+              {micSupported && (
+                <button
+                  type="button"
+                  onClick={toggleMic}
+                  className={`text-sm px-3 py-2 rounded-md font-semibold ${listening ? outlineButton.red : outlineButton.neutral}`}
+                  title="Speak your answer"
+                >
+                  {listening ? "🔴" : "🎤"}
+                </button>
+              )}
+              <button
+                type="submit"
+                className={`text-sm px-4 py-2 rounded-md font-semibold disabled:opacity-50 ${outlineButton.blue}`}
+                disabled={status !== "ready"}
+              >
+                Send
+              </button>
+            </form>
+          </div>
+          <ProgressSidebar />
+        </div>
       </div>
-      <ProgressSidebar />
     </div>
   );
 }
