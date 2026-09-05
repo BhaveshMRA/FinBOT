@@ -1,126 +1,147 @@
-# FinBOT — AI Security Analyst
+# FinBOT: AI Security Analyst
 
-A chatbot that fills out a customer security questionnaire by searching a company's
-own documents first, and only asking a human for what the documents don't cover —
-detecting contradictions along the way instead of guessing.
+An AI chatbot that fills out a vendor security questionnaire by talking to a
+company employee and interrogating the company's own documents, instead of
+making someone manually hunt through policies, reports, and contracts to
+answer the same 60+ questions every time a customer sends a questionnaire.
 
-Built for the Regodit hackathon track "AI Security Analyst." See `Implementation.md`
-for the full architecture/design rationale and `task-phases.md` for the build plan
-and progress.
+## Problem Statement
 
-## Status: functional end-to-end (Phases 0-5 done, Phase 6 voice bonus done)
+When a startup sells to an enterprise, the customer sends a security
+questionnaire: Is MFA enabled? Where is customer data stored? Do you encrypt
+data at rest? Who has access to production? The answers exist, but they're
+scattered across policy documents, audit reports, contracts, and people's
+heads, they're incomplete, and sometimes they contradict each other. Filling
+the questionnaire out by hand is slow, error-prone, and nobody wants to do it
+before a deal deadline.
 
-- 24 source documents parsed → 257 searchable chunks, 2 diagram assets
-- 66 real questionnaire questions across 14 categories (parsed from the actual
-  vendor questionnaire xlsx, not hand-written)
-- A live chat agent that searches docs first, cites evidence, asks smart
-  follow-ups instead of accepting vague answers, flags conflicts, tags multiple
-  respondents, and never re-asks a resolved question
-- A deterministic `/report` page (+ downloadable `.md`) grouping every question
-  into Verified from company info / Confirmed by user / Conflicted / Unknown
-- Voice: speak your answer (browser mic) and optionally hear replies aloud
-  (ElevenLabs) — see "Voice (optional)" below
-- `npx tsc --noEmit` and `npm run build` both verified clean
+## Our Solution
 
-## Demo script
+FinBOT is a conversational agent that:
+1. **Searches the company's own documents first** for every question, and only
+   asks a human for what the documents don't cover.
+2. **Never guesses.** If nothing is documented, it asks, and remembers the
+   answer for next time.
+3. **Pushes back on vague answers** with targeted follow-ups instead of
+   accepting a one-word "yes."
+4. **Catches contradictions** (a policy says one thing, a person says another)
+   and asks for clarification instead of silently picking a side.
+5. **Remembers everything** in a persistent profile, so it never re-asks a
+   resolved question and any correction is logged, not silently overwritten.
+6. **Generates the finished questionnaire**, clearly split into what's verified
+   from company documents, what's confirmed by a human, and what's still
+   unknown, each with a confidence score and a clickable source.
 
-1. Open http://localhost:3000. Say: **"Hi, I'm Priya from DevOps. Is MFA enabled?"**
-   → the sidebar tags "Answering as: Priya (DevOps)"; the agent searches docs,
-   finds the Password & Secrets Policy, cites it, logs 95% confidence.
-2. Ask something vague: **"Do we perform backups?"** → watch it search the SOC2
-   report instead of guessing, then ask a pointed follow-up about whether the
-   documented setup is still current.
-3. Ask about something not in any doc (e.g. background checks) → it asks you
-   directly rather than fabricating an answer.
-4. Correct something you already answered → the agent updates it and the change
-   is logged (not silently overwritten) - visible in `data/profile.json`'s
-   `changeLog`.
-5. Click **"View report"** → the full 66-question categorized report, each
-   answered item showing confidence and its evidence source or respondent.
-6. (if `ELEVENLABS_API_KEY` is set) Toggle **"🔊 voice replies"** and ask
-   another question, or click **🎤** and speak your answer instead of typing.
+## Key Features
 
-## Folder layout
+| Feature | What it does |
+|---|---|
+| Search before asking | Every question triggers a document search first; only unanswerable ones go to a human |
+| Evidence for every answer | Every answer carries a clickable link to the exact source document, or the respondent's own quote |
+| Confidence scores | Each answer gets a 0-100% confidence score based on how it was sourced |
+| Smart follow-ups | Vague or compound answers get a targeted follow-up instead of being accepted at face value |
+| Conflict detection | Doc-vs-doc, doc-vs-user, or user-vs-user disagreements are flagged and resolved explicitly, never guessed away |
+| Persistent memory | A profile survives across the whole conversation (and across sessions) - no re-asking, and corrections are audit-logged |
+| Priority-driven | Unanswered questions are worked high-priority-first, and the sidebar always shows what matters most |
+| Multi-stakeholder support | Different people can answer different sections; who-said-what is tracked and cross-checked |
+| Auto-generated report | One click produces the full categorized questionnaire, downloadable as Markdown |
+| Voice interaction | Speak your answers (browser mic) and optionally hear replies read aloud (ElevenLabs) |
+
+## Tech Stack
+
+- **Next.js 16 (App Router) + React 19** - single app for both the UI and the API
+- **Vercel AI SDK (`ai` + `@ai-sdk/anthropic` + `@ai-sdk/react`)** - the agent's
+  tool-calling loop (`streamText`) and the chat UI (`useChat`)
+- **Claude Sonnet 5** as the reasoning model
+- **`mammoth` / `xlsx` / `pdf-parse`** - extract text from the real source
+  documents (`.docx`, `.xlsx`, `.pdf`)
+- **`react-markdown`** - renders the agent's formatted responses (bold, quotes,
+  lists) instead of showing raw markdown syntax
+- **ElevenLabs API** - text-to-speech for spoken replies; the browser's native
+  `SpeechRecognition` handles speech-to-text (no extra service needed)
+- **Plain JSON files** as the datastore (`data/index.json` for search,
+  `data/profile.json` for the live security profile) - deliberately simple for
+  a single-session demo; see Implementation.md for the production upgrade path
+- No vector DB, no embeddings: retrieval is keyword/term-overlap search, which
+  is enough for policy documents that share vocabulary with the questions
+
+## How It Works
 
 ```
-app/
-  page.tsx               chat UI: messages, evidence/confidence badges, sidebar
-  report/page.tsx        the generated questionnaire report view
-  api/chat/route.ts      the agent: streamText + 5 tools, system prompt rules
-  api/profile/route.ts   GET - current profile (used by the sidebar)
-  api/report/route.ts    GET - the report as markdown
-  api/speak/route.ts     POST {text} -> audio/mpeg via ElevenLabs (501 if no key set)
-lib/
-  types.ts                shared types: Chunk, Evidence, QuestionnaireItem, Profile
-  search.ts               searchDocuments(query, k) - keyword search over index.json
-  confidence.ts           computeConfidence(status, opts) - status -> 0-100 score
-  profile.ts              getProfile/updateItem/flagConflict/setRespondent -
-                           the only way anything gets persisted (data/profile.json)
-  report.ts               buildReportMarkdown(profile) - deterministic report render
-  system-prompt.ts        the 9 behavioral rules the agent follows
-scripts/
-  ingest.mjs               extracts + chunks the 24 source docs -> data/index.json
-  parse-questionnaire.mjs  parses the real vendor xlsx -> data/questions.seed.json
-  test-profile.ts          assert-based smoke test for lib/profile.ts + lib/search.ts
-data/                 generated at ingest time — gitignored, not checked in:
-  raw/                  extracted source documents (from the 5 zips below)
-  index.json            chunked, searchable text extracted from raw/
-  assets.json           non-text files (diagrams) kept as citable references
-  questions.seed.json    questionnaire questions parsed from the vendor xlsx
-  profile.json           the live, persistent security profile (the "memory")
-*.zip                 source documents as provided (gitignored — see below)
-Implementation.md     architecture & design decisions
-task-phases.md        phased build plan with a hackathon deadline clock
+5 source zips (real company docs)
+        |
+        v
+scripts/ingest.mjs  --------->  data/index.json   (257 searchable text chunks)
+scripts/parse-questionnaire.mjs -> data/questions.seed.json  (66 real questions, 14 categories)
+        |
+        v
+data/profile.json  <-- the persistent "memory": one entry per question,
+        |               with status, answer, confidence, evidence, and a
+        |               change log for corrections
+        v
+Chat UI  <-->  /api/chat (agent loop)  <-->  5 tools:
+                 |                            searchDocuments
+                 | system prompt encodes      getProfile
+                 | 9 behavioral rules:        updateItem   (rejects a save with no evidence)
+                 | search-first, no           flagConflict
+                 | guessing, follow-ups,      setRespondent
+                 | conflicts, memory,
+                 | priority ordering
+                 v
+        /report page  -->  deterministic categorized questionnaire
+                            (code-rendered from profile.json, not an LLM
+                            summary, so nothing gets dropped or hallucinated)
 ```
 
-### Source documents (not committed — see `.gitignore`)
+The agent can only persist anything by calling a tool, and `updateItem` itself
+refuses to save a non-trivial answer with zero evidence attached. That's what
+makes "show your evidence" and "never guess" enforced behavior rather than a
+prompt suggestion the model could ignore.
 
-Five zips sit at the project root, provided by the challenge:
-1. Sample vendor questionnaire (`.xlsx`) — the actual question list to fill in
-2. Company policies (13 `.docx`)
-3. Security assessment reports (VAPT, SOC2 Type II — `.docx`)
-4. Contracts & agreements (`.docx`)
-5. Infrastructure/internal info (`.xlsx`, `.pdf`, `.docx`, 2 diagram `.png`s)
-
-## Running locally
+## How to Run / Use It
 
 ```bash
 npm install
-npm run ingest              # extracts + chunks the 5 source zips -> data/
-npm run parse-questionnaire # parses the real vendor xlsx -> data/questions.seed.json
-npm run test:profile        # sanity-checks lib/profile.ts + lib/search.ts
+npm run ingest              # extract + chunk the 5 source documents -> data/
+npm run parse-questionnaire # parse the real vendor questionnaire -> data/questions.seed.json
+npm run test:profile        # sanity check (evidence enforcement, conflict flagging, search)
 ```
 
-Add `.env.local` with `ANTHROPIC_API_KEY=<your key>` (gitignored, never committed),
-then:
+Add a `.env.local` file:
+```
+ANTHROPIC_API_KEY=<your key>
+ELEVENLABS_API_KEY=<optional, enables spoken replies>
+```
 
+Then:
 ```bash
 npm run dev
 ```
 
-Open http://localhost:3000. To reset the demo to a fresh, unanswered state, delete
-`data/profile.json` before starting the server (it's regenerated from
-`questions.seed.json` on first read).
+Open http://localhost:3000 and talk to it, for example:
+- *"Is MFA enabled?"* - it searches, finds the policy, cites it.
+- *"Do we perform backups?"* then answer vaguely - it pushes for specifics.
+- *"I'm Priya from DevOps"* - tags who's answering.
+- Click **View report** any time to see the categorized questionnaire so far.
 
-### Voice (optional)
+To reset to a clean, fully-unanswered state, delete `data/profile.json` (it
+regenerates from `questions.seed.json` on the next request).
 
-Add `ELEVENLABS_API_KEY=<your key>` to `.env.local` to enable spoken replies (the
-mic input works with no key needed — it's the browser's own `SpeechRecognition`).
-No key configured → the voice toggle just does nothing silently; nothing breaks.
+## Project Documents
 
-## Known limitations
+- `Implementation.md` - full architecture, data model, and design rationale
+- `task-phases.md` - the phased build log against the hackathon deadline
 
-- Single-user, single-session, local JSON persistence — fine for a demo, not for
-  concurrent users or a real deploy.
-- Keyword search will miss paraphrased evidence not sharing vocabulary with the
-  source docs.
-- No auth — respondent identity is self-declared (`setRespondent`), not verified.
-- Report page renders raw markdown syntax rather than styled HTML — readable,
-  not polished (no markdown-rendering dependency added, by design).
+## Known Limitations
 
-## Mandatory hackathon tooling
+- Single-session, local JSON persistence: fine for this demo, not for
+  concurrent users or a production deploy (upgrade path: Postgres/Neon).
+- Keyword search misses evidence that's paraphrased far from the question's
+  own wording (upgrade path: embeddings-based retrieval).
+- Respondent identity is self-declared (`setRespondent`), not authenticated.
 
-- **GIDE** — the IDE this project is being built in.
-- **Block Convey PRISM** — agent observability/tracing, connected to
-  `github.com/BhaveshMRA/FinBOT`. Live-tracing SDK integration is pending
-  confirmation of what its "Live setup" step requires.
+## Mandatory Hackathon Tooling
+
+- **GIDE** - the IDE this project was built in.
+- **Block Convey PRISM** - agent observability/tracing, connected to
+  `github.com/BhaveshMRA/FinBOT` for repository discovery.
