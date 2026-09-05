@@ -6,6 +6,8 @@ import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import type { Components } from "react-markdown";
 import type { Profile, QuestionnaireItem } from "@/lib/types.ts";
+import type { UIMessage } from "ai";
+import { getSavedChats, saveChat, deleteChat, type SavedChat } from "@/lib/chatHistory.ts";
 
 // Voice bonus (Implementation.md §9): browser-native STT, ElevenLabs TTS.
 // Both degrade silently when unsupported/unconfigured - never blocks the core chat.
@@ -251,12 +253,106 @@ function ProgressSidebar() {
   );
 }
 
+function HistorySidebar({
+  open,
+  onClose,
+  chats,
+  onLoad,
+  onDelete,
+  onNewChat,
+}: {
+  open: boolean;
+  onClose: () => void;
+  chats: SavedChat[];
+  onLoad: (chat: SavedChat) => void;
+  onDelete: (id: string) => void;
+  onNewChat: () => void;
+}) {
+  return (
+    <>
+      <div
+        onClick={onClose}
+        className={`fixed inset-0 bg-black/50 z-40 transition-opacity ${open ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+      />
+      <div
+        className={`fixed top-0 right-0 h-full w-[350px] bg-[#f5f5f4] shadow-xl z-50 flex flex-col transition-transform ${
+          open ? "translate-x-0" : "translate-x-full"
+        }`}
+      >
+        <div className="p-5 border-b border-[#e5e5e3] bg-white flex justify-between items-center">
+          <h2 className="text-base font-semibold m-0">Chat history</h2>
+          <button onClick={onClose} className="text-[#888] text-xl hover:text-[#555]">✕</button>
+        </div>
+        <div className="p-4">
+          <button onClick={onNewChat} className={`w-full text-sm font-semibold px-3 py-2 rounded-md ${outlineButton.blue}`}>
+            + New chat
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-4 pb-4">
+          {chats.length === 0 ? (
+            <div className="text-sm text-[#999] text-center mt-5">No saved chats yet.</div>
+          ) : (
+            chats.map((chat) => (
+              <div
+                key={chat.id}
+                className="bg-white border border-[#e5e5e3] rounded-lg p-3 mb-3 cursor-pointer hover:border-[#1a3e7e]"
+                onClick={() => onLoad(chat)}
+              >
+                <div className="flex justify-between items-start gap-2">
+                  <div className="text-sm font-medium text-[#1c1c1c]">{chat.title}</div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete(chat.id);
+                    }}
+                    className="text-[#999] hover:text-[#7a1a1a] text-sm"
+                    title="Delete"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="text-xs text-[#999] mt-1">{new Date(chat.savedAt).toLocaleString()}</div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
 export default function Chat() {
-  const { messages, sendMessage, status } = useChat();
+  const { messages, sendMessage, status, setMessages } = useChat();
   const [input, setInput] = useState("");
   const [voiceOut, setVoiceOut] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [savedChats, setSavedChats] = useState<SavedChat[]>([]);
   const lastSpokenId = useRef<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (historyOpen) setSavedChats(getSavedChats());
+  }, [historyOpen]);
+
+  const handleSaveChat = () => {
+    if (messages.length === 0) return;
+    saveChat(messages as UIMessage[]);
+    setSavedChats(getSavedChats());
+  };
+
+  const handleLoadChat = (chat: SavedChat) => {
+    setMessages(chat.messages);
+    setHistoryOpen(false);
+  };
+
+  const handleDeleteChat = (id: string) => {
+    setSavedChats(deleteChat(id));
+  };
+
+  const handleNewChat = () => {
+    setMessages([]);
+    setHistoryOpen(false);
+  };
 
   const { supported: micSupported, listening, toggle: toggleMic } = useSpeechToText((transcript) => {
     if (transcript.trim()) sendMessage({ text: transcript });
@@ -302,6 +398,13 @@ export default function Chat() {
             <Link href="/report" className={`text-sm font-semibold px-4 py-2 rounded-md ${outlineButton.blue}`}>
               View report
             </Link>
+            <button
+              onClick={() => setHistoryOpen(true)}
+              className="text-2xl text-[#555] hover:text-[#1c1c1c]"
+              title="Chat history"
+            >
+              ☰
+            </button>
           </div>
         </div>
         <div className="text-[#666] text-sm mb-4">AI Security Analyst</div>
@@ -387,10 +490,25 @@ export default function Chat() {
                 Send
               </button>
             </form>
+            <button
+              onClick={handleSaveChat}
+              disabled={messages.length === 0}
+              className="self-start mt-2 text-xs text-[#999] hover:text-[#1a3e7e] disabled:opacity-40"
+            >
+              💾 Save this chat
+            </button>
           </div>
           <ProgressSidebar />
         </div>
       </div>
+      <HistorySidebar
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        chats={savedChats}
+        onLoad={handleLoadChat}
+        onDelete={handleDeleteChat}
+        onNewChat={handleNewChat}
+      />
     </div>
   );
 }
