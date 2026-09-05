@@ -133,6 +133,24 @@ long, cut the README update to one paragraph, not to zero.
       follow-up, multi-stakeholder tagging, report generation).
 - [x] Committed and pushed at every phase boundary — nothing left uncommitted.
 
+## Phase 7 — Mandatory tooling: PRISM live tracing — DONE
+- [x] PRISM's onboarding blocked on GitHub discovery for an empty repo (see
+      Phase 0) - resolved once real code was pushed. Its "Live setup" step
+      pointed at `prismtrace-sdk` (Python/pip, LangChain-oriented) - not usable
+      from this Node/TS app. Used PRISM's "Zero-Code Proxy" connector instead
+      (`lib/model.ts`): point `@ai-sdk/anthropic`'s `baseURL` at PRISM's proxy
+      with an `X-PRISMtrace-Key` header, no SDK needed.
+- [x] Found a real bug in PRISM's proxy: any request with `stream: true`
+      returns HTTP 500 (confirmed by curling the proxy directly, with and
+      without streaming - non-streaming works). Worked around it with the AI
+      SDK's `simulateStreamingMiddleware`, which forces the actual HTTP call
+      to be non-streaming (works against PRISM) while still exposing a normal
+      stream to `streamText`/`useChat` - zero UX change.
+      Falls back to calling Anthropic directly if `PRISMTRACE_API_KEY` isn't set.
+- [x] Verified live in PRISM's dashboard: 5/5 real chat requests appeared in
+      Traces with correct model (`claude-sonnet-5`), latency, and token counts.
+- [x] README's "Mandatory Hackathon Tooling" section updated with the full story.
+
 ## Phase 6 — Stretch bonuses — voice DONE, questionnaire-upload NOT ATTEMPTED
 - [x] Voice: browser `SpeechRecognition` mic button (speech -> sent as a chat
       message) + a "voice replies" toggle that POSTs the latest assistant
