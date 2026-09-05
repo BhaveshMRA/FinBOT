@@ -2,7 +2,7 @@ import { anthropic } from "@ai-sdk/anthropic";
 import { streamText, convertToModelMessages, tool, stepCountIs, type UIMessage } from "ai";
 import { z } from "zod";
 import { searchDocuments } from "@/lib/search.ts";
-import { getProfile, updateItem, flagConflict, setRespondent, appendHistory, EvidenceRequiredError } from "@/lib/profile.ts";
+import { getProfile, updateItem, flagConflict, setRespondent, appendHistory } from "@/lib/profile.ts";
 import { SYSTEM_PROMPT } from "@/lib/system-prompt.ts";
 
 export const maxDuration = 300;
@@ -61,8 +61,10 @@ export async function POST(req: Request) {
           try {
             return updateItem(id, { ...rest, evidence: stampedEvidence });
           } catch (err) {
-            if (err instanceof EvidenceRequiredError) return { error: err.message };
-            throw err;
+            // never let a hallucinated id or other bad input crash the stream -
+            // surface it to the model as a tool result so it can recover (e.g.
+            // call getProfile again to find the right id).
+            return { error: err instanceof Error ? err.message : String(err) };
           }
         },
       }),
@@ -74,7 +76,13 @@ export async function POST(req: Request) {
           description: z.string(),
           parties: z.array(z.string()).describe('e.g. ["doc:mfa-policy.docx", "user:Priya"]'),
         }),
-        execute: async ({ id, description, parties }) => flagConflict(id, description, parties),
+        execute: async ({ id, description, parties }) => {
+          try {
+            return flagConflict(id, description, parties);
+          } catch (err) {
+            return { error: err instanceof Error ? err.message : String(err) };
+          }
+        },
       }),
       setRespondent: tool({
         description: "Tag the current speaker so their answers/evidence are attributed to them by name.",

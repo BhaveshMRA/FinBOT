@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import type { Chunk } from "./types.ts";
 
@@ -15,6 +15,11 @@ let cachedChunks: Chunk[] | null = null;
 function loadChunks(): Chunk[] {
   if (cachedChunks) return cachedChunks;
   const indexPath = path.join(process.cwd(), "data", "index.json");
+  if (!existsSync(indexPath)) {
+    console.warn("[search] data/index.json not found - run `npm run ingest` first. Returning no results.");
+    cachedChunks = [];
+    return cachedChunks;
+  }
   cachedChunks = JSON.parse(readFileSync(indexPath, "utf-8"));
   return cachedChunks!;
 }
