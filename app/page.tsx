@@ -341,7 +341,17 @@ export default function Chat() {
   };
 
   const handleLoadChat = (chat: SavedChat) => {
-    setMessages(chat.messages);
+    // Strip tool-call/result parts before replaying into the live conversation.
+    // Tools are the only permitted persistence mechanism (Implementation.md §5
+    // rule 7-ish, enforced by lib/profile.ts) - re-injecting an old getProfile/
+    // updateItem result as context would let the model reason against a stale
+    // snapshot instead of the real current data/profile.json. Keeping only text
+    // parts preserves the human-readable transcript without replaying fake state.
+    const textOnly = chat.messages.map((m) => ({
+      ...m,
+      parts: m.parts.filter((p) => p.type === "text"),
+    }));
+    setMessages(textOnly);
     setHistoryOpen(false);
   };
 
