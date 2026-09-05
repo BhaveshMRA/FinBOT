@@ -284,7 +284,11 @@ function HistorySidebar({
           <button onClick={onClose} className="text-[#888] text-xl hover:text-[#555]">✕</button>
         </div>
         <div className="p-4">
-          <button onClick={onNewChat} className={`w-full text-sm font-semibold px-3 py-2 rounded-md ${outlineButton.blue}`}>
+          <button
+            onClick={onNewChat}
+            title="Clears this conversation view; your assessment progress is saved"
+            className={`w-full text-sm font-semibold px-3 py-2 rounded-md ${outlineButton.blue}`}
+          >
             + New chat
           </button>
         </div>
@@ -327,6 +331,7 @@ export default function Chat() {
   const [voiceOut, setVoiceOut] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [savedChats, setSavedChats] = useState<SavedChat[]>([]);
+  const [viewingPastChat, setViewingPastChat] = useState(false);
   const lastSpokenId = useRef<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -352,6 +357,7 @@ export default function Chat() {
       parts: m.parts.filter((p) => p.type === "text"),
     }));
     setMessages(textOnly);
+    setViewingPastChat(true);
     setHistoryOpen(false);
   };
 
@@ -361,6 +367,7 @@ export default function Chat() {
 
   const handleNewChat = () => {
     setMessages([]);
+    setViewingPastChat(false);
     setHistoryOpen(false);
   };
 
@@ -426,6 +433,11 @@ export default function Chat() {
         <div className="flex gap-4 items-start">
           <div className="bg-white border border-[#e5e5e3] rounded-xl p-5 flex-1 flex flex-col" style={{ height: "calc(100vh - 220px)" }}>
             <h2 className="text-[13px] font-semibold text-[#555] uppercase tracking-wide mb-3">Conversation</h2>
+            {viewingPastChat && (
+              <div className={`text-xs rounded-lg px-3 py-2 mb-3 ${pill.amber}`}>
+                Viewing a past conversation. Its text may be outdated, the live assessment (sidebar, report) always reflects current data.
+              </div>
+            )}
             <div className="flex-1 overflow-y-auto space-y-3 min-h-0">
               {messages.length === 0 && (
                 <div className="text-[#999] text-sm">Say hello, or ask about a control (e.g. &ldquo;Is MFA enabled?&rdquo;).</div>
