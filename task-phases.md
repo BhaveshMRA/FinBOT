@@ -14,47 +14,70 @@ long, cut the README update to one paragraph, not to zero.
       - **4. Contracts_agreements** → 2 `.docx`
       - **5. Infrastructure_internal info** → 2 `.xlsx`, 1 `.pdf`, 2 `.docx`, 2 `.png`
       Formats needed: `mammoth` (docx), `xlsx`, `pdf-parse`. No OCR for the 2 PNGs.
-- [ ] `create-next-app` (App Router, TS) in this directory.
-- [ ] `npm i mammoth xlsx pdf-parse ai @ai-sdk/anthropic` (or gateway equivalent) —
-      only these, nothing speculative.
-- [ ] Extract each zip into `data/raw/<category>/...`, category = folder name with
-      numeric prefix stripped (e.g. `Company policies`, not `2. Company policies`).
-- [ ] README v0: what this app is, folder layout, how to run `npm run dev`.
+- [x] `create-next-app` (App Router, TS, Tailwind) scaffolded — Next.js 16.3.4,
+      React 19.2.8.
+- [x] `npm i mammoth xlsx pdf-parse ai @ai-sdk/react zod` — installed.
+      **BLOCKER (open)**: no model API key in the environment yet
+      (Anthropic/OpenAI/AI Gateway) — needed before Phase 3's `/api/chat` route
+      can actually call a model. Ask user for one before starting Phase 3.
+- [x] Extracted each zip into `data/raw/<category>/...`, numeric prefix stripped.
+      Confirmed contents match the Phase 0 inventory exactly (13 docx in Company
+      policies, etc. — see README.md).
+- [x] `git init`, remote `github.com/BhaveshMRA/FinBOT` added, initial commit
+      pushed — unblocks PRISM's GitHub discovery (was failing with HTTP 409 on
+      an empty repo).
+- [x] README v0 written: what this app is, folder layout, how to run, mandatory
+      tooling section (GIDE + PRISM status).
 
-## Phase 1 — Ingestion Pipeline (11:50–12:30, 40 min)
-- [ ] Parsers: `mammoth` (13+ docx), `xlsx` (asset inventory, access review
-      records — NOT the vendor questionnaire xlsx, that's Phase 2), `pdf-parse`
-      (W-9, network architecture doc). PNGs → just record filename+category into
-      `data/assets.json`, no parsing.
-- [ ] Chunker: ~300–500 words/chunk, keep source file + category as metadata.
-- [ ] `scripts/ingest.ts` → writes `data/index.json` (array of `Chunk`).
-- [ ] `npm run ingest` script in package.json.
-- [ ] Sanity check: log chunk count per source file, spot-check 2–3 chunks read
-      correctly (no binary garbage) — docx via mammoth can leave odd whitespace,
-      trim it.
-- [ ] README: ingestion section — what it does, how to re-run after adding docs.
+## Phase 1 — Ingestion Pipeline (11:50–12:30, 40 min) — DONE
+- [x] `scripts/ingest.mjs` (plain ESM, no ts-node/tsx dep) — mammoth for docx,
+      `XLSX.read(buffer)` for xlsx (note: `XLSX.readFile` isn't exported under
+      ESM import, had to read the buffer myself), `new PDFParse({data}).getText()`
+      for pdf (v2 API, not the old `pdf(buffer)` callable). PNGs recorded into
+      `data/assets.json`, not parsed.
+- [x] Chunker: fixed 400-word windows, no overlap (ponytail: add overlap only if
+      demo search misses evidence split across a chunk boundary).
+- [x] `npm run ingest` — **257 chunks across 24 files, 2 non-text assets.** All
+      24 real documents parsed successfully, zero failures on the second run.
+- [x] `scripts/parse-questionnaire.mjs` — parses the REAL vendor questionnaire's
+      "Vendor Security Responses" sheet (not the 7 brief examples): **66 real
+      questions across 14 categories** (Governance, Third-Party Risk Mgmt,
+      Security Awareness & Training, Privacy, Data Security, Physical Security,
+      Web App Security, Secure Coding, Vulnerability Mgmt, BC/DR, Incident
+      Response, Network & Endpoint Security, Asset Management, Risk Assessment).
+      Priority assigned per category (Implementation.md §5b, updated with real
+      category names).
+- [x] Data quality note for the demo: **question #52 in the source file has no
+      question text** (a genuine gap in the provided spreadsheet — merged-cell
+      artifact). Parser doesn't drop it or guess; it's kept with a flagged
+      placeholder so the agent surfaces it as unknown/needs-attention rather
+      than silently skipping a question ID. Worth mentioning to judges — it's
+      a live example of "ambiguous/incomplete source data."
+- [x] README: ingestion section added.
 
-## Phase 2 — Search & Profile Store (12:30–13:05, 35 min) [+5 min for bonus fields]
-- [ ] `lib/search.ts`: `searchDocuments(query, k=5)` — keyword/term-overlap scoring
-      over `index.json`, returns `{sourceFile, text}[]`.
-- [ ] `scripts/parse-questionnaire.ts`: parse
-      `Regodit_Comprehensive_Vendor_Security_Questionnaire_Clean.xlsx` rows into
-      `data/questions.seed.json`. **Check for an existing risk/category/criticality
-      column while parsing** — if present, map it straight to `priority`; if not,
-      apply the category-keyword fallback (Implementation.md §5b).
-- [ ] `lib/confidence.ts`: one function, status → confidence lookup
-      (Implementation.md §5a). No ML, no config file — a switch statement.
-- [ ] `lib/profile.ts`: `getProfile()` (priority-sorted), `updateItem(id, patch)`
-      (rejects empty `evidence[]` on non-unknown status; auto-diffs previous
-      answer/status into `changeLog` before overwriting), `flagConflict(id,
-      description, parties)`, `setRespondent(name, role?)` — read/write
-      `data/profile.json`, seeded from `questions.seed.json` on first run.
-- [ ] Quick manual test: call search + profile functions from a scratch script —
-      confirm round-trip, confirm `updateItem` rejects no-evidence calls, confirm
-      a second `updateItem` on the same id produces a `changeLog` entry.
-- [ ] README: data model section (Chunk + QuestionnaireItem shapes incl.
-      confidence/priority/evidence/changeLog, one example) + note that questions
-      come from the actual vendor questionnaire file.
+## Phase 2 — Search & Profile Store (12:30–13:05, 35 min) — DONE
+- [x] `lib/search.ts`: `searchDocuments(query, k=5)` — keyword/term-overlap
+      scoring over `index.json`. Verified: "encryption" query returns 3 hits.
+- [x] `scripts/parse-questionnaire.mjs` (see Phase 1 — done there since it
+      needed the raw file inspection first).
+- [x] `lib/confidence.ts`: `computeConfidence(status, opts)` lookup
+      (Implementation.md §5a) — no ML, no config file.
+- [x] `lib/profile.ts`: `getProfile()` (unresolved-first, then priority-sorted),
+      `updateItem(id, patch)` (throws `EvidenceRequiredError` on empty evidence
+      for a non-unknown status; auto-diffs into `changeLog` on overwrite),
+      `flagConflict(id, description, parties)`, `setRespondent(name, role?)`,
+      `appendHistory(role, content)` — backed by `data/profile.json`, seeded
+      from `questions.seed.json` on first read.
+- [x] `lib/types.ts`: shared `Chunk`/`Evidence`/`QuestionnaireItem`/`Profile`
+      types, matching Implementation.md §3.
+- [x] `scripts/test-profile.ts` — assert-based smoke test (backs up/restores
+      any real `profile.json` so it's safe to run anytime): evidence
+      enforcement ✓, changeLog on correction ✓, conflict flagging ✓, search
+      returns hits ✓. Run via `npm run test:profile`.
+      Note: internal `lib/*.ts` imports use explicit `.ts` extensions —
+      required for this test script to run directly under Node's native TS
+      type-stripping (Node 25); harmless for Next.js's bundler resolution.
+- [x] README: data model + how to run the smoke test.
 
 ## Phase 3 — Conversational Agent (13:05–13:50, 45 min)
 - [ ] `/api/chat` route: `streamText` with tools `searchDocuments`, `getProfile`,

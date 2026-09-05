@@ -192,12 +192,17 @@ Non-negotiable rules encoded in the system prompt:
 | `conflicted`, unresolved | 20–30 |
 | `unknown` | 0 |
 
-### 5b. Priority heuristic
-Check the vendor questionnaire xlsx for an existing risk/category/criticality column
-first (commercial vendor questionnaires usually have one — confirm during Phase 2
-parsing). If present, map it directly. If absent, fallback by category keyword:
-Access Control / Data Protection / Encryption / Incident Response → `high`;
-Vendor & Asset Management → `medium`; HR / Admin / general → `low`.
+### 5b. Priority heuristic (confirmed against the real file)
+No per-question risk/criticality column exists in the source xlsx (checked
+`SecurityQuestionnaireMatrix` — that sheet computes vendor-level risk, not
+per-question weight). Priority is assigned by the real 14 categories found in
+the "Vendor Security Responses" sheet (66 questions total):
+- **high**: Data Security, Vulnerability Management, Incident Response,
+  Network & Endpoint Security, Asset Management, Risk Assessment, Physical Security
+- **medium** (default): Governance, Third-Party Risk Management,
+  Business Continuity & Disaster Recovery, Web Application Security,
+  Secure Coding, Privacy
+- **low**: Security Awareness & Training
 
 ### 5c. Multiple stakeholders
 `setRespondent("Priya", "DevOps")` at the start of a segment tags every subsequent

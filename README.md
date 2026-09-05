@@ -10,13 +10,30 @@ and progress.
 
 ## Status
 
-Phase 0 (scaffolding) in progress. Not yet functional — no chat route or ingestion
-pipeline exists yet.
+Phases 0-2 done: ingestion, questionnaire parsing, search, and the profile store
+all work and are tested. **No chat route or UI yet (Phase 3)** — the agent doesn't
+exist as a conversation yet, only its building blocks do.
+
+- 24 source documents parsed → 257 searchable chunks, 2 diagram assets
+- 66 real questionnaire questions parsed across 14 categories (from the actual
+  vendor questionnaire xlsx, not hand-written)
+- `data/profile.json` — the persistent security profile, evidence-enforced and
+  correction-audited (see `lib/profile.ts`)
 
 ## Folder layout
 
 ```
 app/                  Next.js App Router (UI + /api routes)
+lib/
+  types.ts              shared types: Chunk, Evidence, QuestionnaireItem, Profile
+  search.ts             searchDocuments(query, k) - keyword search over index.json
+  confidence.ts         computeConfidence(status, opts) - status -> 0-100 score
+  profile.ts            getProfile/updateItem/flagConflict/setRespondent -
+                         the only way anything gets persisted (data/profile.json)
+scripts/
+  ingest.mjs             extracts + chunks the 24 source docs -> data/index.json
+  parse-questionnaire.mjs  parses the real vendor xlsx -> data/questions.seed.json
+  test-profile.ts         assert-based smoke test for lib/profile.ts + lib/search.ts
 data/                 generated at ingest time — gitignored, not checked in:
   raw/                  extracted source documents (from the 5 zips below)
   index.json            chunked, searchable text extracted from raw/
@@ -37,12 +54,13 @@ Five zips sit at the project root, provided by the challenge:
 4. Contracts & agreements (`.docx`)
 5. Infrastructure/internal info (`.xlsx`, `.pdf`, `.docx`, 2 diagram `.png`s)
 
-Run `npm run ingest` (added in Phase 1) to extract and index them into `data/`.
-
 ## Running locally
 
 ```bash
 npm install
+npm run ingest              # extracts + chunks the 5 source zips -> data/
+npm run parse-questionnaire # parses the real vendor xlsx -> data/questions.seed.json
+npm run test:profile        # sanity-checks lib/profile.ts + lib/search.ts
 npm run dev
 ```
 

@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "ingest": "node scripts/ingest.mjs",
+    "parse-questionnaire": "node scripts/parse-questionnaire.mjs",
+    "test:profile": "node scripts/test-profile.ts"
   },
   "dependencies": {
     "@ai-sdk/react": "^4.0.96",
