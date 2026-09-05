@@ -176,12 +176,18 @@ function StatusPill({ status }: { status: string }) {
 function ProgressSidebar() {
   const [profile, setProfile] = useState<Profile | null>(null);
 
+  const load = () => fetch("/api/profile").then((r) => r.json()).then(setProfile);
+
   useEffect(() => {
-    const load = () => fetch("/api/profile").then((r) => r.json()).then(setProfile);
     load();
     const interval = setInterval(load, 3000);
     return () => clearInterval(interval);
   }, []);
+
+  const reset = () => {
+    if (!confirm("Reset the demo? This clears all answers back to unknown.")) return;
+    fetch("/api/profile", { method: "DELETE" }).then((r) => r.json()).then(setProfile);
+  };
 
   if (!profile) return null;
 
@@ -193,7 +199,12 @@ function ProgressSidebar() {
   return (
     <aside className="w-72 shrink-0 flex flex-col gap-4">
       <div className="bg-white border border-[#e5e5e3] rounded-xl p-5">
-        <h2 className="text-[13px] font-semibold text-[#555] uppercase tracking-wide mb-3">Progress</h2>
+        <div className="flex justify-between items-center mb-3">
+          <h2 className="text-[13px] font-semibold text-[#555] uppercase tracking-wide">Progress</h2>
+          <button onClick={reset} className="text-xs text-[#999] hover:text-[#7a1a1a]" title="Reset the demo to a fresh, unanswered state">
+            Reset demo
+          </button>
+        </div>
         {profile.currentRespondent && (
           <div className="mb-3 text-xs text-[#1a3e7e]">
             Answering as <strong>{profile.currentRespondent.name}</strong>
