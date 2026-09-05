@@ -157,6 +157,20 @@ function ToolPart({ type, output }: { type: string; output: unknown }) {
   return null;
 }
 
+function ListeningWaveform() {
+  return (
+    <div className="flex items-end justify-center gap-0.5 h-4 w-5" aria-label="Listening">
+      {[0, 1, 2, 3, 4].map((i) => (
+        <span
+          key={i}
+          className="w-0.5 bg-[#7a1a1a] rounded-full"
+          style={{ animation: "wave-bar 0.9s ease-in-out infinite", animationDelay: `${i * 0.12}s` }}
+        />
+      ))}
+    </div>
+  );
+}
+
 function StatusPill({ status }: { status: string }) {
   const map: Record<string, { style: string; label: string }> = {
     ready: { style: pill.green, label: "Ready" },
@@ -252,6 +266,18 @@ export default function Chat() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, status]);
 
+  // Global shortcut: Cmd + Right Shift toggles the mic from anywhere on the page.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.metaKey && e.code === "ShiftRight" && !e.repeat) {
+        e.preventDefault();
+        toggleMic();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [toggleMic]);
+
   useEffect(() => {
     if (!voiceOut || status !== "ready") return;
     const last = messages[messages.length - 1];
@@ -268,18 +294,21 @@ export default function Chat() {
       <div className="max-w-[1100px] mx-auto">
         <div className="flex justify-between items-center mb-1">
           <h1 className="text-[22px] font-semibold m-0">FinBOT</h1>
-          <div className="flex items-center gap-3">
-            <label className="text-xs text-[#555] flex items-center gap-1">
-              <input type="checkbox" checked={voiceOut} onChange={(e) => setVoiceOut(e.target.checked)} />
+          <div className="flex items-center gap-4">
+            <label className="text-sm text-[#555] flex items-center gap-2">
+              <input type="checkbox" className="w-4 h-4" checked={voiceOut} onChange={(e) => setVoiceOut(e.target.checked)} />
               🔊 voice replies
             </label>
-            <Link href="/report" className={`text-xs font-semibold px-3 py-1.5 rounded-md ${outlineButton.blue}`}>
+            <Link href="/report" className={`text-sm font-semibold px-4 py-2 rounded-md ${outlineButton.blue}`}>
               View report
             </Link>
           </div>
         </div>
         <div className="text-[#666] text-sm mb-4">AI Security Analyst</div>
-        <div className="mb-6"><StatusPill status={status} /></div>
+        <div className="mb-6 flex items-center gap-3">
+          <StatusPill status={status} />
+          <span className="text-xs text-[#999]">⌘+Return to send &middot; ⌘+Right Shift for mic</span>
+        </div>
 
         <div className="flex gap-4 items-start">
           <div className="bg-white border border-[#e5e5e3] rounded-xl p-5 flex-1 flex flex-col" style={{ height: "calc(100vh - 220px)" }}>
@@ -330,16 +359,24 @@ export default function Chat() {
                 className="flex-1 border border-[#d9d9d6] rounded-md px-3 py-2 text-sm bg-white"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                    e.preventDefault();
+                    if (!input.trim()) return;
+                    sendMessage({ text: input });
+                    setInput("");
+                  }
+                }}
                 placeholder="Let's fill out the questionnaire..."
               />
               {micSupported && (
                 <button
                   type="button"
                   onClick={toggleMic}
-                  className={`text-sm px-3 py-2 rounded-md font-semibold ${listening ? outlineButton.red : outlineButton.neutral}`}
-                  title="Speak your answer"
+                  className={`text-sm px-3 py-2 rounded-md font-semibold flex items-center justify-center min-w-[44px] ${listening ? outlineButton.red : outlineButton.neutral}`}
+                  title="Speak your answer (⌘+Right Shift)"
                 >
-                  {listening ? "🔴" : "🎤"}
+                  {listening ? <ListeningWaveform /> : "🎤"}
                 </button>
               )}
               <button
