@@ -1,9 +1,9 @@
-import { anthropic } from "@ai-sdk/anthropic";
 import { streamText, convertToModelMessages, tool, stepCountIs, type UIMessage } from "ai";
 import { z } from "zod";
 import { searchDocuments } from "@/lib/search.ts";
 import { getProfile, updateItem, flagConflict, setRespondent, appendHistory } from "@/lib/profile.ts";
 import { SYSTEM_PROMPT } from "@/lib/system-prompt.ts";
+import { chatModel } from "@/lib/model.ts";
 
 export const maxDuration = 300;
 
@@ -27,7 +27,7 @@ export async function POST(req: Request) {
   }
 
   const result = streamText({
-    model: anthropic("claude-sonnet-5"),
+    model: chatModel,
     system: SYSTEM_PROMPT,
     messages: await convertToModelMessages(messages),
     stopWhen: stepCountIs(8),

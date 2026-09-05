@@ -64,6 +64,8 @@ FinBOT is a conversational agent that:
   a single-session demo; see Implementation.md for the production upgrade path
 - No vector DB, no embeddings: retrieval is keyword/term-overlap search, which
   is enough for policy documents that share vocabulary with the questions
+- **Block Convey PRISM** (zero-code LLM proxy) - every model call is traced
+  for observability; see "Mandatory Hackathon Tooling" below
 
 ## How It Works
 
@@ -111,6 +113,7 @@ Add a `.env.local` file:
 ```
 ANTHROPIC_API_KEY=<your key>
 ELEVENLABS_API_KEY=<optional, enables spoken replies>
+PRISMTRACE_API_KEY=<optional, routes model calls through Block Convey PRISM for observability>
 ```
 
 Then:
@@ -143,5 +146,14 @@ regenerates from `questions.seed.json` on the next request).
 ## Mandatory Hackathon Tooling
 
 - **GIDE** - the IDE this project was built in.
-- **Block Convey PRISM** - agent observability/tracing, connected to
-  `github.com/BhaveshMRA/FinBOT` for repository discovery.
+- **Block Convey PRISM** - live agent observability. PRISM's official SDK is
+  Python-only (LangChain/LangGraph-oriented), so instead we use its zero-code
+  LLM proxy: `lib/model.ts` points the Anthropic client at PRISM's proxy URL
+  with an `X-PRISMtrace-Key` header, so every real model call is traced
+  without adding a Python dependency to a Node/TypeScript app. PRISM's proxy
+  currently 500s on streaming requests, worked around with the AI SDK's
+  `simulateStreamingMiddleware` (forces a non-streaming call to the proxy,
+  which works, while still streaming the response to the browser). Verified
+  live: 5/5 real requests appear in PRISM's Traces dashboard with correct
+  model, latency, and token counts. Falls back to calling Anthropic directly
+  if `PRISMTRACE_API_KEY` isn't set.
