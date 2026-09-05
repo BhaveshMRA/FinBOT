@@ -12,6 +12,7 @@
     "test:profile": "node scripts/test-profile.ts"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.49",
     "@ai-sdk/react": "^4.0.96",
     "ai": "^7.0.93",
     "mammoth": "^1.12.2",
